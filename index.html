@@ -1831,10 +1831,11 @@ function processMultipleFiles(files) {
                     state.uploadedFiles.push(fileInfo);
                 }
 
-                // Extract project name from company_codes or first suitable file
-                if (detectedType.type === 'company_codes' || !config.project.name || config.project.name === 'Mustermann GmbH') {
-                    if (data[0] && (data[0].NAME || data[0].Name || data[0].BUTXT || data[0].Firma || data[0].Company)) {
-                        config.project.name = data[0].NAME || data[0].Name || data[0].BUTXT || data[0].Firma || data[0].Company;
+                // Extract project name from company_codes
+                if (detectedType.type === 'company_codes' && data.length > 0) {
+                    var projectName = extractProjectName(file.name, data);
+                    if (projectName) {
+                        config.project.name = projectName;
                         var projNameEl = document.getElementById('project-name');
                         if (projNameEl) projNameEl.textContent = config.project.name;
                     }
@@ -1961,6 +1962,49 @@ function updateConfigFromFile(fileType, data) {
             config.sd.condition_types = rowCount;
             break;
     }
+}
+
+function extractProjectName(filename, data) {
+    // Try to extract from filename first (e.g., "AquaLux_company_codes.xlsx" -> "AquaLux")
+    var fnMatch = filename.match(/^([A-Za-z][A-Za-z0-9äöüÄÖÜß]+)[-_]/);
+    var filenamePrefix = fnMatch ? fnMatch[1] : null;
+
+    // Get company name from first row
+    var firstRow = data[0];
+    var companyName = firstRow.BUTXT || firstRow.NAME || firstRow.Name || firstRow.Firma || firstRow.Company || firstRow.name || '';
+
+    // If filename has a good prefix, use it to build the name
+    if (filenamePrefix && filenamePrefix.length > 2 && filenamePrefix !== 'SAP') {
+        // Check if it matches the company name
+        if (companyName.toLowerCase().indexOf(filenamePrefix.toLowerCase()) === 0) {
+            // Find the company type from any row
+            for (var i = 0; i < data.length; i++) {
+                var rowName = data[i].BUTXT || data[i].NAME || data[i].Name || '';
+                if (rowName.indexOf('GmbH') !== -1) return filenamePrefix + ' GmbH';
+                if (rowName.indexOf('AG') !== -1) return filenamePrefix + ' AG';
+                if (rowName.indexOf('Ltd') !== -1) return filenamePrefix + ' Ltd';
+                if (rowName.indexOf('Inc') !== -1) return filenamePrefix + ' Inc.';
+                if (rowName.indexOf('Ltda') !== -1) return filenamePrefix + ' Ltda.';
+            }
+            return filenamePrefix + ' GmbH';
+        }
+        return filenamePrefix + ' GmbH';
+    }
+
+    // Fallback: Use company name from data
+    if (companyName) {
+        // Clean up names like "AquaLux Zentrale München" -> "AquaLux GmbH"
+        var words = companyName.split(' ');
+        if (words.length > 1) {
+            var skipWords = ['Zentrale', 'Hauptsitz', 'Werk', 'Niederlassung', 'France', 'USA', 'Brasil'];
+            if (skipWords.indexOf(words[1]) !== -1) {
+                return words[0] + ' GmbH';
+            }
+        }
+        return companyName;
+    }
+
+    return null;
 }
 
 function removeUploadedFile(index) {
@@ -2410,6 +2454,16 @@ function processBotFiles(files) {
                 if (!exists) {
                     state.uploadedFiles.push(fileInfo);
                     updateConfigFromFile(detectedType.type, jsonData);
+                }
+
+                // Extract project name from company_codes
+                if (detectedType.type === 'company_codes' && jsonData.length > 0) {
+                    var projectName = extractProjectName(file.name, jsonData);
+                    if (projectName) {
+                        config.project.name = projectName;
+                        var projNameEl = document.getElementById('project-name');
+                        if (projNameEl) projNameEl.textContent = config.project.name;
+                    }
                 }
 
                 results.push({
