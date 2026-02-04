@@ -168,6 +168,10 @@
                         <div class="w-2 h-2 rounded-full bg-blue-500 pulse"></div>
                         <span class="text-sm text-blue-300" id="run-indicator-text">Run aktiv</span>
                     </div>
+                    <button onclick="resetDashboard()" id="reset-btn" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition flex items-center gap-2 border border-slate-600" title="Dashboard zurücksetzen">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4 text-slate-300"></i>
+                        <span class="text-slate-300">Reset</span>
+                    </button>
                     <button onclick="startNewRun()" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg font-medium hover:opacity-90 transition flex items-center gap-2">
                         <i data-lucide="rocket" class="w-4 h-4"></i>
                         Neuer Run
@@ -831,6 +835,125 @@ function renderMigration() {
 
     html += '</div>';
 
+    // ACDOCA/ACDOCP Universal Journal Visualization
+    html += '<div class="card rounded-xl p-6 mt-6">';
+    html += '<h3 class="text-lg font-semibold mb-4 flex items-center gap-2">';
+    html += '<i data-lucide="database" class="w-5 h-5 text-green-400"></i> Universal Journal - Echte Datenstruktur</h3>';
+    html += '<p class="text-sm text-slate-400 mb-6">So werden Ihre Daten in S/4HANA ACDOCA & ACDOCP gespeichert:</p>';
+
+    // ACDOCA Table
+    html += '<div class="mb-6">';
+    html += '<div class="flex items-center gap-3 mb-3">';
+    html += '<div class="px-3 py-1 bg-green-500/20 text-green-400 rounded-lg font-mono text-sm font-bold">ACDOCA</div>';
+    html += '<span class="text-slate-300">Universal Journal - Actual (FI/CO/ML Belege)</span></div>';
+    html += '<div class="overflow-x-auto rounded-lg border border-slate-700">';
+    html += '<table class="w-full text-xs">';
+    html += '<thead class="bg-slate-800">';
+    html += '<tr class="text-slate-400">';
+    html += '<th class="px-2 py-2 text-left font-mono">RCLNT</th>';
+    html += '<th class="px-2 py-2 text-left font-mono">RLDNR</th>';
+    html += '<th class="px-2 py-2 text-left font-mono">RBUKRS</th>';
+    html += '<th class="px-2 py-2 text-left font-mono">GJAHR</th>';
+    html += '<th class="px-2 py-2 text-left font-mono">BELNR</th>';
+    html += '<th class="px-2 py-2 text-left font-mono">DOCLN</th>';
+    html += '<th class="px-2 py-2 text-left font-mono">RACCT</th>';
+    html += '<th class="px-2 py-2 text-left font-mono">RCNTR</th>';
+    html += '<th class="px-2 py-2 text-left font-mono">PRCTR</th>';
+    html += '<th class="px-2 py-2 text-left font-mono">HSL</th>';
+    html += '<th class="px-2 py-2 text-left font-mono">RHCUR</th>';
+    html += '<th class="px-2 py-2 text-left font-mono">BUDAT</th></tr></thead>';
+    html += '<tbody class="font-mono">';
+
+    // Sample ACDOCA records - dynamisch basierend auf hochgeladenen Daten
+    var sampleBukrs = config.fi.company_codes.length > 0 ? config.fi.company_codes[0].code : '1000';
+    var acdocaRecords = [
+        { RCLNT: '100', RLDNR: '0L', RBUKRS: sampleBukrs, GJAHR: '2024', BELNR: '0100000001', DOCLN: '001', RACCT: '0061100000', RCNTR: 'KOST1000', PRCTR: 'PR1000', HSL: '12.500,00', RHCUR: 'EUR', BUDAT: '15.01.2024' },
+        { RCLNT: '100', RLDNR: '0L', RBUKRS: sampleBukrs, GJAHR: '2024', BELNR: '0100000001', DOCLN: '002', RACCT: '0014000000', RCNTR: '', PRCTR: '', HSL: '-12.500,00', RHCUR: 'EUR', BUDAT: '15.01.2024' },
+        { RCLNT: '100', RLDNR: '0L', RBUKRS: sampleBukrs, GJAHR: '2024', BELNR: '0100000002', DOCLN: '001', RACCT: '0040000000', RCNTR: 'KOST2000', PRCTR: 'PR2000', HSL: '8.750,00', RHCUR: 'EUR', BUDAT: '18.01.2024' },
+        { RCLNT: '100', RLDNR: '0L', RBUKRS: config.fi.company_codes.length > 1 ? config.fi.company_codes[1].code : '1100', GJAHR: '2024', BELNR: '1100000001', DOCLN: '001', RACCT: '0047100000', RCNTR: 'KOST3000', PRCTR: 'PR1000', HSL: '25.000,00', RHCUR: 'EUR', BUDAT: '20.01.2024' }
+    ];
+
+    for (var a = 0; a < acdocaRecords.length; a++) {
+        var r = acdocaRecords[a];
+        var rowBg = a % 2 === 0 ? 'bg-slate-900/50' : 'bg-slate-800/30';
+        html += '<tr class="' + rowBg + ' border-t border-slate-700/50 hover:bg-slate-700/30">';
+        html += '<td class="px-2 py-2 text-slate-400">' + r.RCLNT + '</td>';
+        html += '<td class="px-2 py-2 text-blue-400">' + r.RLDNR + '</td>';
+        html += '<td class="px-2 py-2 text-amber-400">' + r.RBUKRS + '</td>';
+        html += '<td class="px-2 py-2 text-slate-300">' + r.GJAHR + '</td>';
+        html += '<td class="px-2 py-2 text-cyan-400">' + r.BELNR + '</td>';
+        html += '<td class="px-2 py-2 text-slate-400">' + r.DOCLN + '</td>';
+        html += '<td class="px-2 py-2 text-green-400">' + r.RACCT + '</td>';
+        html += '<td class="px-2 py-2 text-purple-400">' + r.RCNTR + '</td>';
+        html += '<td class="px-2 py-2 text-pink-400">' + r.PRCTR + '</td>';
+        html += '<td class="px-2 py-2 text-emerald-400 text-right">' + r.HSL + '</td>';
+        html += '<td class="px-2 py-2 text-slate-400">' + r.RHCUR + '</td>';
+        html += '<td class="px-2 py-2 text-slate-300">' + r.BUDAT + '</td></tr>';
+    }
+    html += '</tbody></table></div>';
+    html += '<div class="mt-2 text-xs text-slate-500">Ledger 0L = Führendes Ledger | RACCT = Sachkonto | RCNTR = Kostenstelle | HSL = Hauswährungsbetrag</div>';
+    html += '</div>';
+
+    // ACDOCP Table (Plan Data)
+    html += '<div>';
+    html += '<div class="flex items-center gap-3 mb-3">';
+    html += '<div class="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-lg font-mono text-sm font-bold">ACDOCP</div>';
+    html += '<span class="text-slate-300">Universal Journal - Plan (CO Planwerte)</span></div>';
+    html += '<div class="overflow-x-auto rounded-lg border border-slate-700">';
+    html += '<table class="w-full text-xs">';
+    html += '<thead class="bg-slate-800">';
+    html += '<tr class="text-slate-400">';
+    html += '<th class="px-2 py-2 text-left font-mono">RCLNT</th>';
+    html += '<th class="px-2 py-2 text-left font-mono">RLDNR</th>';
+    html += '<th class="px-2 py-2 text-left font-mono">RBUKRS</th>';
+    html += '<th class="px-2 py-2 text-left font-mono">GJAHR</th>';
+    html += '<th class="px-2 py-2 text-left font-mono">VRESSION</th>';
+    html += '<th class="px-2 py-2 text-left font-mono">RACCT</th>';
+    html += '<th class="px-2 py-2 text-left font-mono">RCNTR</th>';
+    html += '<th class="px-2 py-2 text-left font-mono">PRCTR</th>';
+    html += '<th class="px-2 py-2 text-left font-mono">HSL</th>';
+    html += '<th class="px-2 py-2 text-left font-mono">RHCUR</th>';
+    html += '<th class="px-2 py-2 text-left font-mono">POPER</th></tr></thead>';
+    html += '<tbody class="font-mono">';
+
+    // Sample ACDOCP records
+    var acdocpRecords = [
+        { RCLNT: '100', RLDNR: '0L', RBUKRS: sampleBukrs, GJAHR: '2024', VRESSION: 'PLAN1', RACCT: '0061100000', RCNTR: 'KOST1000', PRCTR: 'PR1000', HSL: '150.000,00', RHCUR: 'EUR', POPER: '001' },
+        { RCLNT: '100', RLDNR: '0L', RBUKRS: sampleBukrs, GJAHR: '2024', VRESSION: 'PLAN1', RACCT: '0040000000', RCNTR: 'KOST2000', PRCTR: 'PR2000', HSL: '85.000,00', RHCUR: 'EUR', POPER: '001' },
+        { RCLNT: '100', RLDNR: '0L', RBUKRS: config.fi.company_codes.length > 1 ? config.fi.company_codes[1].code : '1100', GJAHR: '2024', VRESSION: 'PLAN1', RACCT: '0047100000', RCNTR: 'KOST3000', PRCTR: 'PR1000', HSL: '220.000,00', RHCUR: 'EUR', POPER: '001' }
+    ];
+
+    for (var p = 0; p < acdocpRecords.length; p++) {
+        var pr = acdocpRecords[p];
+        var rowBgP = p % 2 === 0 ? 'bg-slate-900/50' : 'bg-slate-800/30';
+        html += '<tr class="' + rowBgP + ' border-t border-slate-700/50 hover:bg-slate-700/30">';
+        html += '<td class="px-2 py-2 text-slate-400">' + pr.RCLNT + '</td>';
+        html += '<td class="px-2 py-2 text-blue-400">' + pr.RLDNR + '</td>';
+        html += '<td class="px-2 py-2 text-amber-400">' + pr.RBUKRS + '</td>';
+        html += '<td class="px-2 py-2 text-slate-300">' + pr.GJAHR + '</td>';
+        html += '<td class="px-2 py-2 text-cyan-400">' + pr.VRESSION + '</td>';
+        html += '<td class="px-2 py-2 text-green-400">' + pr.RACCT + '</td>';
+        html += '<td class="px-2 py-2 text-purple-400">' + pr.RCNTR + '</td>';
+        html += '<td class="px-2 py-2 text-pink-400">' + pr.PRCTR + '</td>';
+        html += '<td class="px-2 py-2 text-emerald-400 text-right">' + pr.HSL + '</td>';
+        html += '<td class="px-2 py-2 text-slate-400">' + pr.RHCUR + '</td>';
+        html += '<td class="px-2 py-2 text-orange-400">' + pr.POPER + '</td></tr>';
+    }
+    html += '</tbody></table></div>';
+    html += '<div class="mt-2 text-xs text-slate-500">VRESSION = Planversion | POPER = Planperiode | Enthält aggregierte CO-Planwerte</div>';
+    html += '</div>';
+
+    // Info Box
+    html += '<div class="mt-6 p-4 rounded-lg bg-gradient-to-r from-green-500/10 to-blue-500/10 border border-green-500/20">';
+    html += '<div class="flex items-start gap-3">';
+    html += '<i data-lucide="info" class="w-5 h-5 text-green-400 mt-0.5"></i>';
+    html += '<div>';
+    html += '<div class="font-medium text-slate-200 mb-1">Universal Journal - Die Revolution in S/4HANA</div>';
+    html += '<div class="text-sm text-slate-400">Im Universal Journal werden alle FI-, CO- und ML-Buchungen in einer einzigen Tabelle (ACDOCA) zusammengeführt. Dies eliminiert Abstimmprobleme zwischen den Modulen und ermöglicht Echtzeit-Reporting über alle Dimensionen.</div>';
+    html += '</div></div></div>';
+
+    html += '</div>';
+
     return html;
 }
 
@@ -1194,6 +1317,76 @@ function finishRun() {
 
 function stopRun() { state.runStatus = 'failed'; addLog('ERROR', 'Run gestoppt'); render(); }
 function resetRun() { state.runStatus = 'idle'; state.runProgress = 0; state.completedJobs = []; state.logs = []; state.currentRun = null; document.getElementById('run-indicator').classList.add('hidden'); render(); }
+
+function resetDashboard() {
+    // Bestätigungsdialog
+    if (!confirm('Möchten Sie das Dashboard wirklich zurücksetzen?\n\nAlle hochgeladenen Dateien und der Migrationsstatus werden gelöscht.')) {
+        return;
+    }
+
+    // State zurücksetzen
+    state.runStatus = 'idle';
+    state.runProgress = 0;
+    state.completedJobs = [];
+    state.logs = [];
+    state.currentRun = null;
+    state.uploadedFileName = null;
+    state.migrationPhase = 'idle';
+    state.migrationProgress = 0;
+    state.migratedTables = [];
+
+    // Falls uploadedFiles existiert
+    if (state.uploadedFiles) {
+        state.uploadedFiles = [];
+    }
+
+    // Bot Messages zurücksetzen
+    if (state.botMessages) {
+        state.botMessages = [];
+    }
+
+    // Run indicator verstecken
+    var runIndicator = document.getElementById('run-indicator');
+    if (runIndicator) runIndicator.classList.add('hidden');
+
+    // Config auf Standardwerte zurücksetzen
+    config.fi.company_codes = [{ code: '1000', name: config.project.name || 'Hauptsitz', currency: 'EUR', country: 'DE' }];
+    config.fi.gl_accounts = 85;
+    config.fi.tax_codes = 12;
+    config.fi.payment_terms = 8;
+    config.fi.house_banks = 3;
+    config.co.cost_centers = 24;
+    config.co.profit_centers = 6;
+    config.co.cost_elements = 45;
+    config.co.internal_orders = 120;
+    config.mm.plants = 3;
+    config.mm.storage_locations = 12;
+    config.mm.materials = 2500;
+    config.mm.purchasing_orgs = 2;
+    config.mm.vendors = 180;
+    config.sd.sales_orgs = 2;
+    config.sd.distribution_channels = 3;
+    config.sd.divisions = 2;
+    config.sd.customers = 450;
+    config.sd.condition_types = 25;
+
+    // Auf Dashboard wechseln und neu rendern
+    setTab('dashboard');
+
+    // Erfolgsmeldung (kurz einblenden)
+    var btn = document.getElementById('reset-btn');
+    if (btn) {
+        var originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i data-lucide="check" class="w-4 h-4 text-green-400"></i><span class="text-green-400">Reset!</span>';
+        btn.classList.add('border-green-500');
+        setTimeout(function() {
+            btn.innerHTML = originalHTML;
+            btn.classList.remove('border-green-500');
+            lucide.createIcons();
+        }, 1500);
+        lucide.createIcons();
+    }
+}
 
 function startMigration() {
     state.migrationPhase = 'running';
