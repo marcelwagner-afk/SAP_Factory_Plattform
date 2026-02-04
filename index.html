@@ -1739,6 +1739,9 @@ function processMultipleFiles(files) {
                     }
                 }
 
+                // Update config based on file type
+                updateConfigFromFile(detectedType.type, data);
+
                 render();
             } catch (err) {
                 console.error('Error processing file:', file.name, err);
@@ -1815,14 +1818,87 @@ function detectFileType(filename, headers) {
     return { type: 'data', label: 'Daten' };
 }
 
+function updateConfigFromFile(fileType, data) {
+    var rowCount = data.length;
+
+    switch (fileType) {
+        case 'company_codes':
+            config.fi.company_codes = data.map(function(row) {
+                return {
+                    code: row.BUKRS || row.Code || row.code || String(row.ID || ''),
+                    name: row.BUTXT || row.NAME || row.Name || row.Firma || '',
+                    currency: row.WAERS || row.Currency || 'EUR',
+                    country: row.LAND1 || row.Country || 'DE'
+                };
+            });
+            break;
+        case 'gl_accounts':
+            config.fi.gl_accounts = rowCount;
+            break;
+        case 'cost_centers':
+            config.co.cost_centers = rowCount;
+            break;
+        case 'profit_centers':
+            config.co.profit_centers = rowCount;
+            break;
+        case 'plants':
+            config.mm.plants = rowCount;
+            break;
+        case 'materials':
+            config.mm.materials = rowCount;
+            break;
+        case 'vendors':
+            config.mm.vendors = rowCount;
+            break;
+        case 'customers':
+            config.sd.customers = rowCount;
+            break;
+        case 'sales_orgs':
+            config.sd.sales_orgs = rowCount;
+            break;
+        case 'conditions':
+            config.sd.condition_types = rowCount;
+            break;
+    }
+}
+
 function removeUploadedFile(index) {
     state.uploadedFiles.splice(index, 1);
+    recalculateConfigFromFiles();
     render();
 }
 
 function clearUploadedFiles() {
     state.uploadedFiles = [];
+    resetConfigToDefaults();
     render();
+}
+
+function recalculateConfigFromFiles() {
+    // Reset to defaults first
+    resetConfigToDefaults();
+    // Then recalculate from remaining files
+    for (var i = 0; i < state.uploadedFiles.length; i++) {
+        var f = state.uploadedFiles[i];
+        if (f.data && f.data.length > 0) {
+            updateConfigFromFile(f.type, f.data);
+        }
+    }
+}
+
+function resetConfigToDefaults() {
+    config.fi.company_codes = [
+        { code: '1000', name: config.project.name || 'Hauptsitz', currency: 'EUR', country: 'DE' }
+    ];
+    config.fi.gl_accounts = 0;
+    config.co.cost_centers = 0;
+    config.co.profit_centers = 0;
+    config.mm.plants = 0;
+    config.mm.materials = 0;
+    config.mm.vendors = 0;
+    config.sd.customers = 0;
+    config.sd.sales_orgs = 0;
+    config.sd.condition_types = 0;
 }
 
 // Init

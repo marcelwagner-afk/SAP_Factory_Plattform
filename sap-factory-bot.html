@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAP Factory Bot - Ihr KI-Implementierungsassistent</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); }
+        .chat-container { height: calc(100vh - 180px); }
+        .message-bot { background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.15)); border: 1px solid rgba(59, 130, 246, 0.2); }
+        .message-user { background: linear-gradient(135deg, #3b82f6, #8b5cf6); }
+        .typing-dot { animation: typing 1.4s infinite; }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typing { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-8px); } }
+        .quick-btn { transition: all 0.2s; }
+        .quick-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); }
+        .card-response { background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(71, 85, 105, 0.4); }
+        .progress-ring { animation: progress-spin 2s linear infinite; }
+        @keyframes progress-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .fade-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .upload-area { border: 2px dashed rgba(59, 130, 246, 0.4); transition: all 0.3s; }
+        .upload-area:hover { border-color: rgba(59, 130, 246, 0.8); background: rgba(59, 130, 246, 0.05); }
+        .glow { box-shadow: 0 0 30px rgba(59, 130, 246, 0.3); }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    </style>
+</head>
+<body class="min-h-screen text-white">
+
+<!-- Header -->
+<header class="border-b border-slate-700/50 backdrop-blur-md bg-slate-900/80 sticky top-0 z-50">
+    <div class="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center glow">
+                <i data-lucide="bot" class="w-7 h-7"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-xl">SAP Factory Bot</h1>
+                <div class="flex items-center gap-2 text-sm text-slate-400">
+                    <div class="w-2 h-2 rounded-full bg-green-500"></div>
+                    <span>KI-Implementierungsassistent</span>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <div class="text-right text-sm">
+                <div class="text-slate-400">Projekt</div>
+                <div id="project-name" class="font-medium">Kein Projekt geladen</div>
+            </div>
+            <button onclick="resetChat()" class="p-2 rounded-lg hover:bg-slate-700/50 text-slate-400 hover:text-white">
+                <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+            </button>
+        </div>
+    </div>
+</header>
+
+<!-- Chat Container -->
+<main class="max-w-4xl mx-auto px-6">
+    <div id="chat-messages" class="chat-container overflow-y-auto py-6 space-y-4">
+        <!-- Messages will be inserted here -->
+    </div>
+</main>
+
+<!-- Input Area -->
+<footer class="fixed bottom-0 left-0 right-0 border-t border-slate-700/50 backdrop-blur-md bg-slate-900/90">
+    <div class="max-w-4xl mx-auto px-6 py-4">
+        <!-- Quick Actions -->
+        <div id="quick-actions" class="flex gap-2 mb-3 overflow-x-auto pb-2">
+            <!-- Quick action buttons will be inserted here -->
+        </div>
+
+        <!-- Input -->
+        <div class="flex gap-3">
+            <label class="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 cursor-pointer transition">
+                <i data-lucide="paperclip" class="w-5 h-5 text-slate-400"></i>
+                <input type="file" id="file-input" accept=".xlsx,.xls,.csv" multiple class="hidden">
+            </label>
+            <div class="flex-1 relative">
+                <input type="text" id="message-input" placeholder="Nachricht eingeben oder Datei hochladen..."
+                    class="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 focus:border-blue-500 focus:outline-none text-white placeholder-slate-500">
+                <button onclick="sendMessage()" class="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-blue-600 hover:bg-blue-500">
+                    <i data-lucide="send" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<script>
+// ============================================================================
+// STATE
+// ============================================================================
+var state = {
+    messages: [],
+    currentStep: 'welcome',
+    projectName: null,
+    uploadedFiles: [],
+    config: {
+        fi: { company_codes: [], gl_accounts: 0 },
+        co: { cost_centers: 0, profit_centers: 0 },
+        mm: { plants: 0, materials: 0, vendors: 0 },
+        sd: { sales_orgs: 0, customers: 0 }
+    },
+    isTyping: false,
+    executionProgress: 0
+};
+
+var quickActions = {
+    welcome: [
+        { icon: 'upload', text: 'Excel-Templates hochladen', action: 'upload' },
+        { icon: 'play', text: 'Demo starten', action: 'demo' },
+        { icon: 'help-circle', text: 'Was kann ich tun?', action: 'help' }
+    ],
+    uploaded: [
+        { icon: 'eye', text: 'Daten prüfen', action: 'validate' },
+        { icon: 'plus', text: 'Weitere Dateien', action: 'upload' },
+        { icon: 'rocket', text: 'Implementierung starten', action: 'start' }
+    ],
+    running: [
+        { icon: 'pause', text: 'Pausieren', action: 'pause' },
+        { icon: 'file-text', text: 'Status-Report', action: 'status' }
+    ],
+    completed: [
+        { icon: 'download', text: 'Dokumente herunterladen', action: 'download' },
+        { icon: 'refresh-cw', text: 'Neues Projekt', action: 'reset' },
+        { icon: 'bar-chart', text: 'Ergebnisse anzeigen', action: 'results' }
+    ]
+};
+
+// ============================================================================
+// MESSAGING
+// ============================================================================
+function addBotMessage(content, options) {
+    options = options || {};
+    state.messages.push({ type: 'bot', content: content, options: options });
+    renderMessages();
+    scrollToBottom();
+}
+
+function addUserMessage(content) {
+    state.messages.push({ type: 'user', content: content });
+    renderMessages();
+    scrollToBottom();
+}
+
+function showTyping() {
+    state.isTyping = true;
+    renderMessages();
+    scrollToBottom();
+}
+
+function hideTyping() {
+    state.isTyping = false;
+    renderMessages();
+}
+
+function botReply(content, options, delay) {
+    delay = delay || 1000;
+    showTyping();
+    setTimeout(function() {
+        hideTyping();
+        addBotMessage(content, options);
+    }, delay);
+}
+
+// ============================================================================
+// RENDERING
+// ============================================================================
+function renderMessages() {
+    var container = document.getElementById('chat-messages');
+    var html = '';
+
+    for (var i = 0; i < state.messages.length; i++) {
+        var msg = state.messages[i];
+        if (msg.type === 'bot') {
+            html += renderBotMessage(msg.content, msg.options);
+        } else {
+            html += renderUserMessage(msg.content);
+        }
+    }
+
+    if (state.isTyping) {
+        html += renderTypingIndicator();
+    }
+
+    container.innerHTML = html;
+    lucide.createIcons();
+}
+
+function renderBotMessage(content, options) {
+    options = options || {};
+    var html = '<div class="flex gap-3 fade-in">';
+    html += '<div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">';
+    html += '<i data-lucide="bot" class="w-5 h-5"></i></div>';
+    html += '<div class="flex-1 space-y-2">';
+    html += '<div class="message-bot rounded-2xl rounded-tl-md px-4 py-3 max-w-lg">';
+    html += '<p class="text-slate-200">' + content + '</p></div>';
+
+    if (options.card) {
+        html += renderCard(options.card);
+    }
+    if (options.progress) {
+        html += renderProgress(options.progress);
+    }
+    if (options.table) {
+        html += renderTable(options.table);
+    }
+    if (options.files) {
+        html += renderFileList(options.files);
+    }
+
+    html += '</div></div>';
+    return html;
+}
+
+function renderUserMessage(content) {
+    var html = '<div class="flex justify-end fade-in">';
+    html += '<div class="message-user rounded-2xl rounded-tr-md px-4 py-3 max-w-lg">';
+    html += '<p>' + content + '</p></div></div>';
+    return html;
+}
+
+function renderTypingIndicator() {
+    var html = '<div class="flex gap-3 fade-in">';
+    html += '<div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">';
+    html += '<i data-lucide="bot" class="w-5 h-5"></i></div>';
+    html += '<div class="message-bot rounded-2xl rounded-tl-md px-4 py-3">';
+    html += '<div class="flex gap-1">';
+    html += '<div class="w-2 h-2 rounded-full bg-blue-400 typing-dot"></div>';
+    html += '<div class="w-2 h-2 rounded-full bg-blue-400 typing-dot"></div>';
+    html += '<div class="w-2 h-2 rounded-full bg-blue-400 typing-dot"></div>';
+    html += '</div></div></div>';
+    return html;
+}
+
+function renderCard(card) {
+    var html = '<div class="card-response rounded-xl p-4 max-w-lg mt-2">';
+    if (card.title) {
+        html += '<div class="flex items-center gap-2 mb-3">';
+        if (card.icon) html += '<i data-lucide="' + card.icon + '" class="w-5 h-5 text-blue-400"></i>';
+        html += '<span class="font-semibold">' + card.title + '</span></div>';
+    }
+    if (card.items) {
+        html += '<div class="space-y-2">';
+        for (var i = 0; i < card.items.length; i++) {
+            var item = card.items[i];
+            html += '<div class="flex items-center justify-between text-sm">';
+            html += '<span class="text-slate-400">' + item.label + '</span>';
+            html += '<span class="font-medium ' + (item.color || 'text-white') + '">' + item.value + '</span></div>';
+        }
+        html += '</div>';
+    }
+    if (card.actions) {
+        html += '<div class="flex gap-2 mt-4">';
+        for (var j = 0; j < card.actions.length; j++) {
+            var action = card.actions[j];
+            html += '<button onclick="handleAction(\'' + action.action + '\')" class="px-3 py-1.5 text-sm rounded-lg ' + (action.primary ? 'bg-blue-600 hover:bg-blue-500' : 'bg-slate-700 hover:bg-slate-600') + '">' + action.text + '</button>';
+        }
+        html += '</div>';
+    }
+    html += '</div>';
+    return html;
+}
+
+function renderProgress(progress) {
+    var html = '<div class="card-response rounded-xl p-4 max-w-lg mt-2">';
+    html += '<div class="flex items-center justify-between mb-2">';
+    html += '<span class="text-sm text-slate-400">' + progress.label + '</span>';
+    html += '<span class="text-sm font-medium">' + progress.value + '%</span></div>';
+    html += '<div class="h-2 bg-slate-700 rounded-full overflow-hidden">';
+    html += '<div class="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500" style="width:' + progress.value + '%"></div></div>';
+    if (progress.status) {
+        html += '<div class="mt-2 text-sm text-slate-400">' + progress.status + '</div>';
+    }
+    html += '</div>';
+    return html;
+}
+
+function renderTable(table) {
+    var html = '<div class="card-response rounded-xl p-4 max-w-lg mt-2 overflow-x-auto">';
+    if (table.title) {
+        html += '<div class="font-semibold mb-3">' + table.title + '</div>';
+    }
+    html += '<table class="w-full text-sm">';
+    if (table.headers) {
+        html += '<thead><tr class="text-slate-400 border-b border-slate-700">';
+        for (var i = 0; i < table.headers.length; i++) {
+            html += '<th class="text-left py-2 px-2">' + table.headers[i] + '</th>';
+        }
+        html += '</tr></thead>';
+    }
+    html += '<tbody>';
+    for (var j = 0; j < table.rows.length; j++) {
+        html += '<tr class="border-b border-slate-700/50">';
+        for (var k = 0; k < table.rows[j].length; k++) {
+            html += '<td class="py-2 px-2">' + table.rows[j][k] + '</td>';
+        }
+        html += '</tr>';
+    }
+    html += '</tbody></table></div>';
+    return html;
+}
+
+function renderFileList(files) {
+    var html = '<div class="card-response rounded-xl p-4 max-w-lg mt-2">';
+    html += '<div class="font-semibold mb-3">Hochgeladene Dateien</div>';
+    html += '<div class="space-y-2">';
+    for (var i = 0; i < files.length; i++) {
+        var f = files[i];
+        html += '<div class="flex items-center gap-3 p-2 rounded-lg bg-slate-800/50">';
+        html += '<i data-lucide="file-spreadsheet" class="w-5 h-5 text-green-400"></i>';
+        html += '<div class="flex-1 min-w-0">';
+        html += '<div class="text-sm font-medium truncate">' + f.name + '</div>';
+        html += '<div class="text-xs text-slate-500">' + f.rows + ' Zeilen • ' + f.type + '</div></div>';
+        html += '<span class="text-xs px-2 py-0.5 rounded bg-green-500/20 text-green-400">OK</span></div>';
+    }
+    html += '</div></div>';
+    return html;
+}
+
+function renderQuickActions() {
+    var container = document.getElementById('quick-actions');
+    var actions = quickActions[state.currentStep] || quickActions.welcome;
+    var html = '';
+
+    for (var i = 0; i < actions.length; i++) {
+        var a = actions[i];
+        html += '<button onclick="handleAction(\'' + a.action + '\')" class="quick-btn flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm whitespace-nowrap">';
+        html += '<i data-lucide="' + a.icon + '" class="w-4 h-4 text-blue-400"></i>';
+        html += '<span>' + a.text + '</span></button>';
+    }
+
+    container.innerHTML = html;
+    lucide.createIcons();
+}
+
+function scrollToBottom() {
+    var container = document.getElementById('chat-messages');
+    setTimeout(function() {
+        container.scrollTop = container.scrollHeight;
+    }, 100);
+}
+
+// ============================================================================
+// ACTIONS
+// ============================================================================
+function handleAction(action) {
+    switch (action) {
+        case 'upload':
+            document.getElementById('file-input').click();
+            break;
+        case 'demo':
+            startDemo();
+            break;
+        case 'help':
+            showHelp();
+            break;
+        case 'validate':
+            validateData();
+            break;
+        case 'start':
+            startImplementation();
+            break;
+        case 'status':
+            showStatus();
+            break;
+        case 'download':
+            showDownloads();
+            break;
+        case 'results':
+            showResults();
+            break;
+        case 'reset':
+            resetChat();
+            break;
+    }
+}
+
+function sendMessage() {
+    var input = document.getElementById('message-input');
+    var text = input.value.trim();
+    if (!text) return;
+
+    addUserMessage(text);
+    input.value = '';
+
+    // Simple intent detection
+    var lowerText = text.toLowerCase();
+    if (lowerText.indexOf('hilfe') !== -1 || lowerText.indexOf('help') !== -1) {
+        showHelp();
+    } else if (lowerText.indexOf('upload') !== -1 || lowerText.indexOf('hochladen') !== -1) {
+        botReply('Kein Problem! Klicken Sie auf die Büroklammer oder ziehen Sie Ihre Excel-Dateien hierher.');
+    } else if (lowerText.indexOf('start') !== -1 || lowerText.indexOf('begin') !== -1) {
+        if (state.uploadedFiles.length > 0) {
+            startImplementation();
+        } else {
+            botReply('Bitte laden Sie zuerst Ihre Excel-Templates hoch, damit ich die Implementierung starten kann.');
+        }
+    } else if (lowerText.indexOf('status') !== -1) {
+        showStatus();
+    } else {
+        botReply('Ich verstehe. Wie kann ich Ihnen bei der SAP S/4HANA Implementierung helfen? Sie können Excel-Templates hochladen oder eine Demo starten.');
+    }
+}
+
+function showHelp() {
+    addUserMessage('Was kann ich tun?');
+    botReply('Ich bin Ihr KI-Assistent für SAP S/4HANA Implementierungen. Hier ist, was ich für Sie tun kann:', {
+        card: {
+            title: 'Meine Fähigkeiten',
+            icon: 'sparkles',
+            items: [
+                { label: 'Excel-Templates verarbeiten', value: 'FI/CO/MM/SD' },
+                { label: 'Automatisches Customizing', value: '100% automatisiert' },
+                { label: 'Datenmigration', value: 'ECC → S/4HANA' },
+                { label: 'Dokumentation erstellen', value: 'Word-Dokumente' },
+                { label: 'Tests ausführen', value: 'API & Prozesse' }
+            ],
+            actions: [
+                { text: 'Demo starten', action: 'demo', primary: true },
+                { text: 'Dateien hochladen', action: 'upload' }
+            ]
+        }
+    });
+}
+
+function startDemo() {
+    addUserMessage('Demo starten');
+
+    state.projectName = 'Demo GmbH';
+    state.uploadedFiles = [
+        { name: 'Buchungskreise.xlsx', rows: 2, type: 'Buchungskreise' },
+        { name: 'Sachkonten.xlsx', rows: 85, type: 'Sachkonten' },
+        { name: 'Kostenstellen.xlsx', rows: 24, type: 'Kostenstellen' },
+        { name: 'Materialstamm.xlsx', rows: 2500, type: 'Materialstamm' },
+        { name: 'Kunden.xlsx', rows: 450, type: 'Kunden' },
+        { name: 'Lieferanten.xlsx', rows: 180, type: 'Lieferanten' }
+    ];
+
+    document.getElementById('project-name').textContent = state.projectName;
+    state.currentStep = 'uploaded';
+    renderQuickActions();
+
+    botReply('Perfekt! Ich habe Demo-Daten für "Demo GmbH" geladen:', {
+        files: state.uploadedFiles
+    }, 800);
+
+    setTimeout(function() {
+        // Build summary from actual uploaded files
+        var totalRecords = state.uploadedFiles.reduce(function(sum, f) { return sum + f.rows; }, 0);
+        var items = [{ label: 'Projekt', value: state.projectName }];
+
+        for (var i = 0; i < state.uploadedFiles.length; i++) {
+            var f = state.uploadedFiles[i];
+            items.push({ label: f.type, value: f.rows.toLocaleString() });
+        }
+        items.push({ label: 'Gesamt', value: totalRecords.toLocaleString() + ' Datensätze', color: 'text-blue-400' });
+
+        botReply('Die Konfiguration wurde analysiert. Hier ist die Zusammenfassung:', {
+            card: {
+                title: 'Projektübersicht',
+                icon: 'building-2',
+                items: items,
+                actions: [
+                    { text: 'Implementierung starten', action: 'start', primary: true },
+                    { text: 'Daten prüfen', action: 'validate' }
+                ]
+            }
+        });
+    }, 2500);
+}
+
+function validateData() {
+    addUserMessage('Daten prüfen');
+    botReply('Ich prüfe die hochgeladenen Daten...', {
+        progress: { label: 'Validierung', value: 0, status: 'Starte Prüfung...' }
+    });
+
+    var progress = 0;
+    var interval = setInterval(function() {
+        progress += 20;
+        if (progress >= 100) {
+            clearInterval(interval);
+            setTimeout(function() {
+                addBotMessage('Alle Daten wurden erfolgreich validiert!', {
+                    table: {
+                        title: 'Validierungsergebnis',
+                        headers: ['Datei', 'Status', 'Zeilen'],
+                        rows: state.uploadedFiles.map(function(f) {
+                            return [f.name, '<span class="text-green-400">✓ OK</span>', f.rows];
+                        })
+                    }
+                });
+            }, 500);
+        } else {
+            state.messages[state.messages.length - 1].options.progress.value = progress;
+            state.messages[state.messages.length - 1].options.progress.status = 'Prüfe ' + state.uploadedFiles[Math.floor(progress / 25)].name + '...';
+            renderMessages();
+        }
+    }, 400);
+}
+
+function startImplementation() {
+    addUserMessage('Implementierung starten');
+    state.currentStep = 'running';
+    renderQuickActions();
+
+    botReply('Ausgezeichnet! Ich starte jetzt die automatische S/4HANA Implementierung für ' + state.projectName + '.', {
+        progress: { label: 'Implementierungsfortschritt', value: 0, status: 'Initialisiere...' }
+    });
+
+    var jobs = [
+        { name: 'FI Customizing', duration: 1500 },
+        { name: 'CO Customizing', duration: 1200 },
+        { name: 'MM Customizing', duration: 1000 },
+        { name: 'SD Customizing', duration: 1000 },
+        { name: 'Business Partner Migration', duration: 1500 },
+        { name: 'Materialstamm Migration', duration: 2000 },
+        { name: 'API Tests', duration: 800 },
+        { name: 'Prozess Tests', duration: 1000 },
+        { name: 'Dokumentation erstellen', duration: 1200 }
+    ];
+
+    var currentJob = 0;
+    var totalJobs = jobs.length;
+
+    function executeNextJob() {
+        if (currentJob >= totalJobs) {
+            finishImplementation();
+            return;
+        }
+
+        var job = jobs[currentJob];
+        var progress = Math.round(((currentJob + 1) / totalJobs) * 100);
+
+        state.messages[state.messages.length - 1].options.progress.value = progress;
+        state.messages[state.messages.length - 1].options.progress.status = job.name + '...';
+        renderMessages();
+
+        currentJob++;
+        setTimeout(executeNextJob, job.duration);
+    }
+
+    setTimeout(executeNextJob, 1000);
+}
+
+function finishImplementation() {
+    state.currentStep = 'completed';
+    renderQuickActions();
+
+    state.messages[state.messages.length - 1].options.progress.value = 100;
+    state.messages[state.messages.length - 1].options.progress.status = 'Abgeschlossen!';
+    renderMessages();
+
+    // Calculate actual totals from uploaded files
+    var totalRecords = state.uploadedFiles.reduce(function(sum, f) { return sum + f.rows; }, 0);
+    var fileCount = state.uploadedFiles.length;
+
+    setTimeout(function() {
+        addBotMessage('🎉 Die Implementierung wurde erfolgreich abgeschlossen!', {
+            card: {
+                title: 'Ergebnis - ' + (state.projectName || 'Projekt'),
+                icon: 'check-circle',
+                items: [
+                    { label: 'Status', value: 'Erfolgreich', color: 'text-green-400' },
+                    { label: 'Verarbeitete Dateien', value: fileCount + ' Dateien' },
+                    { label: 'Migrierte Objekte', value: totalRecords.toLocaleString() },
+                    { label: 'Tests bestanden', value: '39/39' },
+                    { label: 'Dauer', value: '12 Sekunden' },
+                    { label: 'Ersparnis', value: '67%', color: 'text-green-400' }
+                ],
+                actions: [
+                    { text: 'Dokumente herunterladen', action: 'download', primary: true },
+                    { text: 'Ergebnisse anzeigen', action: 'results' }
+                ]
+            }
+        });
+    }, 1000);
+}
+
+function showStatus() {
+    addUserMessage('Status anzeigen');
+
+    var totalRecords = state.uploadedFiles.reduce(function(sum, f) { return sum + f.rows; }, 0);
+    var phaseText = state.currentStep === 'completed' ? 'Abgeschlossen' : state.currentStep === 'running' ? 'In Bearbeitung' : 'Vorbereitung';
+
+    var items = [
+        { label: 'Phase', value: phaseText, color: state.currentStep === 'completed' ? 'text-green-400' : 'text-blue-400' },
+        { label: 'Hochgeladene Dateien', value: state.uploadedFiles.length },
+        { label: 'Datensätze gesamt', value: totalRecords.toLocaleString() },
+        { label: 'Source System', value: 'ECC 6.0' },
+        { label: 'Target System', value: 'S/4HANA 2023' }
+    ];
+
+    botReply('Hier ist der aktuelle Projektstatus:', {
+        card: {
+            title: 'Projektstatus: ' + (state.projectName || 'Kein Projekt'),
+            icon: 'activity',
+            items: items
+        }
+    });
+
+    // Show uploaded files if any
+    if (state.uploadedFiles.length > 0) {
+        setTimeout(function() {
+            addBotMessage('Hochgeladene Dateien:', { files: state.uploadedFiles });
+        }, 800);
+    }
+}
+
+function showDownloads() {
+    addUserMessage('Dokumente herunterladen');
+    botReply('Hier sind alle generierten Dokumente zum Download:', {
+        card: {
+            title: 'Verfügbare Dokumente',
+            icon: 'file-text',
+            items: [
+                { label: 'Implementation Guide', value: '2.4 MB' },
+                { label: 'Configuration Documentation', value: '1.8 MB' },
+                { label: 'Test Execution Report', value: '890 KB' },
+                { label: 'Migration Protocol', value: '1.2 MB' },
+                { label: 'Reconciliation Report', value: '650 KB' }
+            ],
+            actions: [
+                { text: 'Alle herunterladen', action: 'downloadAll', primary: true }
+            ]
+        }
+    });
+}
+
+function showResults() {
+    addUserMessage('Ergebnisse anzeigen');
+
+    // Build rows from actual uploaded files
+    var rows = [];
+    for (var i = 0; i < state.uploadedFiles.length; i++) {
+        var f = state.uploadedFiles[i];
+        rows.push([f.type, f.rows.toLocaleString() + ' Datensätze', '<span class="text-green-400">✓</span>']);
+    }
+
+    // Add summary row
+    var totalRecords = state.uploadedFiles.reduce(function(sum, f) { return sum + f.rows; }, 0);
+    rows.push(['<strong>Gesamt</strong>', '<strong>' + totalRecords.toLocaleString() + ' Datensätze</strong>', '<span class="text-green-400">✓</span>']);
+
+    botReply('Hier ist die detaillierte Ergebnisübersicht basierend auf Ihren Daten:', {
+        table: {
+            title: 'Implementierungsergebnis - ' + (state.projectName || 'Projekt'),
+            headers: ['Typ', 'Objekte', 'Status'],
+            rows: rows
+        }
+    });
+}
+
+function resetChat() {
+    state = {
+        messages: [],
+        currentStep: 'welcome',
+        projectName: null,
+        uploadedFiles: [],
+        config: { fi: {}, co: {}, mm: {}, sd: {} },
+        isTyping: false,
+        executionProgress: 0
+    };
+    document.getElementById('project-name').textContent = 'Kein Projekt geladen';
+    renderMessages();
+    renderQuickActions();
+    initChat();
+}
+
+// ============================================================================
+// FILE HANDLING
+// ============================================================================
+function handleFileUpload(files) {
+    var fileArray = Array.prototype.slice.call(files);
+
+    addUserMessage('Lade ' + fileArray.length + ' Datei(en) hoch...');
+    showTyping();
+
+    var processed = 0;
+    var newFiles = [];
+
+    fileArray.forEach(function(file) {
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+            try {
+                var wb = XLSX.read(ev.target.result, { type: 'binary' });
+                var ws = wb.Sheets[wb.SheetNames[0]];
+                var data = XLSX.utils.sheet_to_json(ws);
+                var headers = data.length > 0 ? Object.keys(data[0]) : [];
+                var type = detectFileType(file.name, headers);
+
+                newFiles.push({
+                    name: file.name,
+                    rows: data.length,
+                    type: type.label,
+                    data: data
+                });
+
+                // Extract project name
+                if (type.type === 'company_codes' && data[0]) {
+                    var name = data[0].NAME || data[0].Name || data[0].BUTXT || data[0].Firma;
+                    if (name) {
+                        state.projectName = name;
+                        document.getElementById('project-name').textContent = name;
+                    }
+                }
+            } catch (err) {
+                newFiles.push({ name: file.name, rows: 0, type: 'Unbekannt' });
+            }
+
+            processed++;
+            if (processed === fileArray.length) {
+                finishUpload(newFiles);
+            }
+        };
+        reader.readAsBinaryString(file);
+    });
+}
+
+function finishUpload(newFiles) {
+    hideTyping();
+    state.uploadedFiles = state.uploadedFiles.concat(newFiles);
+    state.currentStep = 'uploaded';
+    renderQuickActions();
+
+    addBotMessage('Perfekt! Ich habe ' + newFiles.length + ' Datei(en) erfolgreich verarbeitet:', {
+        files: newFiles
+    });
+
+    setTimeout(function() {
+        // Build summary from ALL uploaded files
+        var totalRecords = state.uploadedFiles.reduce(function(sum, f) { return sum + f.rows; }, 0);
+        var items = [];
+
+        if (state.projectName) {
+            items.push({ label: 'Projekt', value: state.projectName });
+        }
+
+        for (var i = 0; i < state.uploadedFiles.length; i++) {
+            var f = state.uploadedFiles[i];
+            items.push({ label: f.type, value: f.rows.toLocaleString() + ' Zeilen' });
+        }
+
+        items.push({ label: 'Gesamt', value: totalRecords.toLocaleString() + ' Datensätze', color: 'text-green-400' });
+
+        botReply('Hier ist die Übersicht aller hochgeladenen Daten:', {
+            card: {
+                title: 'Datenübersicht',
+                icon: 'database',
+                items: items,
+                actions: [
+                    { text: 'Implementierung starten', action: 'start', primary: true },
+                    { text: 'Weitere Dateien', action: 'upload' },
+                    { text: 'Daten prüfen', action: 'validate' }
+                ]
+            }
+        });
+    }, 1500);
+}
+
+function detectFileType(filename, headers) {
+    var fn = filename.toLowerCase();
+    var h = headers.join(' ').toLowerCase();
+
+    if (fn.indexOf('buchungskreis') !== -1 || fn.indexOf('company') !== -1 || h.indexOf('bukrs') !== -1 || h.indexOf('butxt') !== -1) {
+        return { type: 'company_codes', label: 'Buchungskreise' };
+    }
+    if (fn.indexOf('sachkont') !== -1 || fn.indexOf('gl_account') !== -1 || h.indexOf('hkont') !== -1 || h.indexOf('saknr') !== -1) {
+        return { type: 'gl_accounts', label: 'Sachkonten' };
+    }
+    if (fn.indexOf('kostenstell') !== -1 || h.indexOf('kostl') !== -1) {
+        return { type: 'cost_centers', label: 'Kostenstellen' };
+    }
+    if (fn.indexOf('material') !== -1 || h.indexOf('matnr') !== -1) {
+        return { type: 'materials', label: 'Materialstamm' };
+    }
+    if (fn.indexOf('kunde') !== -1 || fn.indexOf('customer') !== -1 || h.indexOf('kunnr') !== -1) {
+        return { type: 'customers', label: 'Kunden' };
+    }
+    if (fn.indexOf('lieferant') !== -1 || fn.indexOf('vendor') !== -1 || h.indexOf('lifnr') !== -1) {
+        return { type: 'vendors', label: 'Lieferanten' };
+    }
+    return { type: 'data', label: 'Daten' };
+}
+
+// ============================================================================
+// INIT
+// ============================================================================
+function initChat() {
+    setTimeout(function() {
+        addBotMessage('Hallo! 👋 Ich bin der SAP Factory Bot, Ihr KI-Assistent für vollautomatisierte S/4HANA Implementierungen.');
+    }, 500);
+
+    setTimeout(function() {
+        botReply('Ich kann Ihre Excel-Templates verarbeiten und automatisch Customizing, Datenmigration und Tests durchführen. Was möchten Sie tun?', {
+            card: {
+                title: 'Schnellstart',
+                icon: 'rocket',
+                items: [
+                    { label: 'Source System', value: 'ECC 6.0' },
+                    { label: 'Target System', value: 'S/4HANA 2023' },
+                    { label: 'Module', value: 'FI, CO, MM, SD' },
+                    { label: 'Automatisierung', value: '100%' }
+                ],
+                actions: [
+                    { text: 'Demo starten', action: 'demo', primary: true },
+                    { text: 'Excel hochladen', action: 'upload' }
+                ]
+            }
+        });
+    }, 1500);
+}
+
+// Event Listeners
+document.addEventListener('DOMContentLoaded', function() {
+    lucide.createIcons();
+    renderQuickActions();
+    initChat();
+
+    document.getElementById('file-input').addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            handleFileUpload(e.target.files);
+            e.target.value = '';
+        }
+    });
+
+    document.getElementById('message-input').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') sendMessage();
+    });
+});
+</script>
+</body>
+</html>
