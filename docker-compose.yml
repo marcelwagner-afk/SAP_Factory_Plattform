@@ -1,0 +1,75 @@
+# =============================================================================
+# SAP Implementation Factory - Docker Compose Configuration
+# =============================================================================
+# Orchestrates the SAP Implementation Factory service
+# Usage: docker-compose up -d
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # SAP Implementation Factory API
+  # ---------------------------------------------------------------------------
+  sap-factory:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sap-implementation-factory
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persist artifacts across restarts
+      - ./artifacts:/app/artifacts
+      # Mount configs for easy access
+      - ./configs:/app/configs:ro
+    environment:
+      - APP_ENV=production
+      - LOG_LEVEL=INFO
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "app.name=sap-implementation-factory"
+      - "app.description=Automated SAP S/4HANA Implementation Platform"
+
+  # ---------------------------------------------------------------------------
+  # Development Mode (hot reload)
+  # Usage: docker-compose --profile dev up sap-factory-dev
+  # ---------------------------------------------------------------------------
+  sap-factory-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sap-factory-dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app
+      - ./configs:/app/configs
+      - ./artifacts:/app/artifacts
+    environment:
+      - APP_ENV=development
+      - LOG_LEVEL=DEBUG
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    profiles:
+      - dev
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  artifacts:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  default:
+    name: sap-factory-network

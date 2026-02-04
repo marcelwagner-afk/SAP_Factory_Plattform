@@ -1,0 +1,23 @@
+# =============================================================================
+# SAP Implementation Factory - Python Dependencies
+# =============================================================================
+
+# Web Framework
+fastapi==0.109.2
+uvicorn[standard]==0.27.1
+pydantic==2.6.1
+
+# YAML Parsing
+pyyaml==6.0.1
+
+# Async Support
+anyio==4.2.0
+httpx==0.26.0
+
+# Development Tools
+python-multipart==0.0.9
+
+# Testing (optional, for development)
+pytest==8.0.0
+pytest-asyncio==0.23.4
+httpx==0.26.0

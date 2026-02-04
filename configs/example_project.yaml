@@ -1,0 +1,457 @@
+# =============================================================================
+# SAP Implementation Factory - Example Project Configuration
+# =============================================================================
+# This YAML file is the Single Source of Truth for an SAP S/4HANA implementation.
+# It defines all customizing, migration, and testing activities to be automated.
+#
+# Structure:
+#   - project: Project metadata
+#   - landscape: Target SAP systems
+#   - scope: Countries, modules, organizational structure
+#   - customizing: Configuration packages with steps
+#   - migration: Data objects to migrate
+#   - testing: Test suites to execute
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# PROJECT METADATA
+# -----------------------------------------------------------------------------
+project:
+  name: "S/4HANA Standard Retail Implementation"
+  customer: "DEMO AG"
+  template: "RETAIL_CORE_DE"
+  version: "1.0.0"
+
+# -----------------------------------------------------------------------------
+# SYSTEM LANDSCAPE
+# Define all target SAP systems (DEV, QAS, PRD)
+# -----------------------------------------------------------------------------
+landscape:
+  systems:
+    - id: DEV
+      client: "100"
+      description: "Development System"
+    - id: QAS
+      client: "200"
+      description: "Quality Assurance System"
+
+# -----------------------------------------------------------------------------
+# IMPLEMENTATION SCOPE
+# Define countries, modules, and organizational units
+# -----------------------------------------------------------------------------
+scope:
+  country: ["DE", "AT"]
+  modules: ["FI", "CO", "MM", "SD"]
+  org:
+    company_codes:
+      - code: "1000"
+        currency: "EUR"
+        name: "DEMO AG Hauptsitz"
+        country: "DE"
+      - code: "1100"
+        currency: "EUR"
+        name: "DEMO AG Österreich"
+        country: "AT"
+    plants:
+      - code: "1000"
+        name: "Werk Hamburg"
+        company_code: "1000"
+      - code: "1100"
+        name: "Werk Wien"
+        company_code: "1100"
+
+# -----------------------------------------------------------------------------
+# CUSTOMIZING CONFIGURATION
+# Define configuration packages with individual steps
+# Steps are executed in order; packages can depend on each other
+# -----------------------------------------------------------------------------
+customizing:
+  packages:
+    # FI Core Configuration
+    - id: "FI_CORE"
+      target: "DEV"
+      description: "Financial Accounting Core Configuration"
+      steps:
+        # Company Code Settings
+        - action: "set_table"
+          table: "T001"
+          key:
+            BUKRS: "1000"
+          values:
+            BUTXT: "DEMO AG Hauptsitz"
+            WAERS: "EUR"
+            LAND1: "DE"
+            SPRAS: "D"
+            KTOPL: "CADE"
+
+        - action: "set_table"
+          table: "T001"
+          key:
+            BUKRS: "1100"
+          values:
+            BUTXT: "DEMO AG Österreich"
+            WAERS: "EUR"
+            LAND1: "AT"
+            SPRAS: "D"
+            KTOPL: "CADE"
+
+        # Chart of Accounts Assignment
+        - action: "set_table"
+          table: "T001K"
+          key:
+            BUKRS: "1000"
+            KTOPL: "CADE"
+          values:
+            PERIV: "K4"
+            XGDPD: "X"
+
+        # Document Types
+        - action: "set_table"
+          table: "T003"
+          key:
+            BLART: "SA"
+          values:
+            BLART: "SA"
+            NUMKR: "01"
+            KOESSION: "BS"
+
+        # Tax Configuration
+        - action: "set_table"
+          table: "T007A"
+          key:
+            KALSM: "TAXD"
+            MWSKZ: "V1"
+          values:
+            TEXT1: "Vorsteuer 19%"
+            KBETR: "19.000"
+
+        - action: "set_table"
+          table: "T007A"
+          key:
+            KALSM: "TAXD"
+            MWSKZ: "A1"
+          values:
+            TEXT1: "Umsatzsteuer 19%"
+            KBETR: "19.000"
+
+        # Payment Terms
+        - action: "set_table"
+          table: "T052"
+          key:
+            ZTERM: "0001"
+          values:
+            ZTAGG: "30"
+            TEXT1: "Zahlbar innerhalb 30 Tagen netto"
+
+    # CO Configuration
+    - id: "CO_CORE"
+      target: "DEV"
+      description: "Controlling Core Configuration"
+      steps:
+        # Controlling Area
+        - action: "call_bapi"
+          bapi: "BAPI_COAREA_CREATE"
+          params:
+            COCONTROLLINGAREA:
+              CO_AREA: "1000"
+              NAME: "DEMO AG Controlling"
+              CURRENCY: "EUR"
+
+        # Cost Centers
+        - action: "set_table"
+          table: "CSKS"
+          key:
+            KOKRS: "1000"
+            KOSTL: "1000"
+          values:
+            KTEXT: "Geschäftsführung"
+            KOSAR: "H"
+            BUKRS: "1000"
+
+        - action: "set_table"
+          table: "CSKS"
+          key:
+            KOKRS: "1000"
+            KOSTL: "1100"
+          values:
+            KTEXT: "Vertrieb"
+            KOSAR: "V"
+            BUKRS: "1000"
+
+        - action: "set_table"
+          table: "CSKS"
+          key:
+            KOKRS: "1000"
+            KOSTL: "1200"
+          values:
+            KTEXT: "Produktion"
+            KOSAR: "F"
+            BUKRS: "1000"
+
+        # Profit Centers
+        - action: "set_table"
+          table: "CEPC"
+          key:
+            KOKRS: "1000"
+            PRCTR: "PC1000"
+          values:
+            KTEXT: "Profit Center Deutschland"
+            BUKRS: "1000"
+
+    # MM Configuration
+    - id: "MM_CORE"
+      target: "DEV"
+      description: "Materials Management Configuration"
+      steps:
+        # Plant Configuration
+        - action: "set_table"
+          table: "T001W"
+          key:
+            WERKS: "1000"
+          values:
+            NAME1: "Werk Hamburg"
+            STRAS: "Hafenstraße 123"
+            ORT01: "Hamburg"
+            PSTLZ: "20095"
+            LAND1: "DE"
+            BUKRS: "1000"
+
+        # Storage Locations
+        - action: "set_table"
+          table: "T001L"
+          key:
+            WERKS: "1000"
+            LGORT: "0001"
+          values:
+            LGOBE: "Hauptlager"
+
+        - action: "set_table"
+          table: "T001L"
+          key:
+            WERKS: "1000"
+            LGORT: "0002"
+          values:
+            LGOBE: "Versandlager"
+
+    # SD Configuration
+    - id: "SD_CORE"
+      target: "DEV"
+      description: "Sales and Distribution Configuration"
+      steps:
+        # Sales Organization
+        - action: "set_table"
+          table: "TVKO"
+          key:
+            VKORG: "1000"
+          values:
+            VTEXT: "Vertrieb Deutschland"
+            WAESSION: "EUR"
+            BUKRS: "1000"
+
+        # Distribution Channel
+        - action: "set_table"
+          table: "TVTW"
+          key:
+            VTWEG: "10"
+          values:
+            VTEXT: "Direktverkauf"
+
+        - action: "set_table"
+          table: "TVTW"
+          key:
+            VTWEG: "20"
+          values:
+            VTEXT: "Handel"
+
+# -----------------------------------------------------------------------------
+# DATA MIGRATION
+# Define objects to migrate with source type and field mapping
+# -----------------------------------------------------------------------------
+migration:
+  objects:
+    # Business Partner Migration (CVI)
+    - id: "BUSINESS_PARTNER"
+      source: "csv"
+      target: "DEV"
+      mapping:
+        BP_ID: "PARTNER"
+        NAME: "NAME_ORG1"
+        COUNTRY: "COUNTRY"
+        CITY: "CITY1"
+        POSTAL_CODE: "POST_CODE1"
+      batch_size: 500
+      validation_rules:
+        - "BP_ID is required"
+        - "NAME is required"
+        - "COUNTRY must be 2 characters"
+
+    # Customer Migration
+    - id: "CUSTOMER"
+      source: "legacy_sap"
+      target: "DEV"
+      mapping:
+        KUNNR: "KUNNR"
+        NAME1: "NAME1"
+        LAND1: "LAND1"
+        ORT01: "ORT01"
+        PSTLZ: "PSTLZ"
+      batch_size: 1000
+
+    # Vendor Migration
+    - id: "VENDOR"
+      source: "csv"
+      target: "DEV"
+      mapping:
+        LIFNR: "LIFNR"
+        NAME1: "NAME1"
+        LAND1: "LAND1"
+        ORT01: "ORT01"
+      batch_size: 500
+
+    # Material Migration
+    - id: "MATERIAL"
+      source: "excel"
+      target: "DEV"
+      mapping:
+        MATNR: "MATNR"
+        MAKTX: "MAKTX"
+        MTART: "MTART"
+        MEINS: "MEINS"
+        MATKL: "MATKL"
+      batch_size: 2000
+
+    # Cost Center Migration
+    - id: "COST_CENTER"
+      source: "csv"
+      target: "DEV"
+      mapping:
+        KOSTL: "KOSTL"
+        KTEXT: "KTEXT"
+        KOSAR: "KOSAR"
+        BUKRS: "BUKRS"
+      batch_size: 200
+
+    # GL Account Migration
+    - id: "GL_ACCOUNT"
+      source: "csv"
+      target: "DEV"
+      mapping:
+        SAKNR: "SAKNR"
+        TXT50: "TXT50"
+        XBILK: "XBILK"
+      batch_size: 500
+
+# -----------------------------------------------------------------------------
+# TESTING CONFIGURATION
+# Define test suites with individual test cases
+# -----------------------------------------------------------------------------
+testing:
+  suites:
+    # API Health Checks
+    - id: "SMOKE_API"
+      target: "DEV"
+      description: "API Connectivity and Health Checks"
+      cases:
+        - id: "API_HEALTH"
+          type: "api"
+          endpoint: "/sap/health"
+          method: "GET"
+          expected_status: 200
+          description: "Check SAP system health endpoint"
+
+        - id: "API_BP"
+          type: "api"
+          endpoint: "/sap/opu/odata/sap/API_BUSINESS_PARTNER"
+          method: "GET"
+          expected_status: 200
+          description: "Check Business Partner API availability"
+
+        - id: "API_MATERIAL"
+          type: "api"
+          endpoint: "/sap/opu/odata/sap/API_MATERIAL_DOCUMENT_SRV"
+          method: "GET"
+          expected_status: 200
+          description: "Check Material Document API availability"
+
+    # BAPI Function Tests
+    - id: "SMOKE_BAPI"
+      target: "DEV"
+      description: "BAPI/RFC Function Tests"
+      cases:
+        - id: "BAPI_COMPANY_CODE"
+          type: "bapi"
+          bapi: "BAPI_COMPANYCODE_GETDETAIL"
+          params:
+            COMPANYCODE: "1000"
+          description: "Verify company code 1000 is accessible"
+
+        - id: "BAPI_COSTCENTER_LIST"
+          type: "bapi"
+          bapi: "BAPI_COSTCENTER_GETLIST"
+          params:
+            CONTROLLINGAREA: "1000"
+          description: "Verify cost center list is retrievable"
+
+    # Process Smoke Tests
+    - id: "SMOKE_P2P"
+      target: "DEV"
+      description: "Procure-to-Pay Process Smoke Test"
+      cases:
+        - id: "PROCESS_P2P"
+          type: "process"
+          process: "PROCURE_TO_PAY"
+          description: "End-to-end P2P process validation"
+
+    - id: "SMOKE_O2C"
+      target: "DEV"
+      description: "Order-to-Cash Process Smoke Test"
+      cases:
+        - id: "PROCESS_O2C"
+          type: "process"
+          process: "ORDER_TO_CASH"
+          description: "End-to-end O2C process validation"
+
+    # Data Validation Tests
+    - id: "DATA_VALIDATION"
+      target: "DEV"
+      description: "Data Migration Validation Tests"
+      cases:
+        - id: "DATA_COMPANY_CODE"
+          type: "data"
+          table: "T001"
+          expected_key:
+            BUKRS: "1000"
+          description: "Verify company code 1000 exists"
+
+        - id: "DATA_PLANT"
+          type: "data"
+          table: "T001W"
+          expected_key:
+            WERKS: "1000"
+          description: "Verify plant 1000 exists"
+
+        - id: "DATA_SALES_ORG"
+          type: "data"
+          table: "TVKO"
+          expected_key:
+            VKORG: "1000"
+          description: "Verify sales organization 1000 exists"
+
+    # Integration Tests
+    - id: "INTEGRATION"
+      target: "DEV"
+      description: "System Integration Tests"
+      cases:
+        - id: "INT_FI_CO"
+          type: "integration"
+          name: "FI-CO Integration"
+          source: "FI"
+          target: "CO"
+          description: "Verify FI to CO integration"
+
+        - id: "INT_MM_FI"
+          type: "integration"
+          name: "MM-FI Integration"
+          source: "MM"
+          target: "FI"
+          description: "Verify MM to FI integration"
